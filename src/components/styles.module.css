@@ -1,0 +1,229 @@
+/* --- VARIABLES & RESET --- */
+:root {
+  --primary-color: #2563eb;
+  --primary-hover: #1d4ed8;
+  --bg-color: #f3f4f6;
+  --card-bg: #ffffff;
+  --text-main: #1f2937;
+  --text-muted: #6b7280;
+  --border-color: #e5e7eb;
+  --success-color: #10b981;
+  --danger-color: #ef4444;
+}
+
+/* Contenedor Principal (App) */
+.formContainer {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text-main);
+  background-color: var(--bg-color);
+  min-height: 100vh;
+}
+
+.formContainer h1 {
+  text-align: center;
+  font-size: 1.5rem;
+  margin-bottom: 2rem;
+  color: #111827;
+  font-weight: 700;
+}
+
+/* --- BOTÓN PRINCIPAL --- */
+.scanBtn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 16px 24px;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  width: 100%;
+  cursor: pointer;
+  margin-bottom: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.scanBtn:active {
+  transform: scale(0.98);
+  background-color: var(--primary-hover);
+}
+
+/* --- INPUTS --- */
+.inputGroup {
+  margin-bottom: 15px;
+  background: var(--card-bg);
+  padding: 12px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid var(--border-color);
+}
+
+.inputGroup label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.inputGroup input {
+  width: 100%;
+  padding: 8px 0;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 1.1rem;
+  color: var(--text-main);
+  background: transparent;
+  outline: none;
+  font-family: monospace; /* Para que los números se vean alineados */
+}
+
+/* Estilo para inputs de solo lectura (parecen datos ya procesados) */
+.inputGroup input[readonly] {
+  color: #111827;
+  font-weight: 500;
+  cursor: default;
+}
+
+/* --- MODAL (Scanner) --- */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9); /* Fondo más oscuro para enfoque */
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify_content: center;
+  align-items: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modalContent {
+  background: #000; /* Fondo negro para integrarse con la cámara */
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Header del Modal */
+.modalHeader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 20px;
+  display: flex;
+  justify_content: space-between;
+  align-items: center;
+  z-index: 10;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+}
+
+.modalHeader h3 {
+  color: white;
+  margin: 0;
+  font-size: 1.2rem;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.closeButton {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify_content: center;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+
+/* --- AREA DE LA CÁMARA --- */
+.qrReader {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* IMPORTANTE: Asegura que el video llene la pantalla */
+.qrReader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* --- OVERLAY VISUAL DE ESCANEO (El recuadro rojo) --- */
+/* Agregaremos este div en el componente React abajo */
+.scanOverlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80%;
+  max-width: 300px;
+  height: 200px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); /* Oscurece lo que está fuera del cuadro */
+  z-index: 5;
+  overflow: hidden;
+}
+
+/* Línea roja animada */
+.scanLine {
+  width: 100%;
+  height: 2px;
+  background: #ef4444;
+  position: absolute;
+  top: 0;
+  box-shadow: 0 0 4px #ef4444;
+  animation: scanMove 2s infinite linear;
+}
+
+.scanInstruction {
+  position: absolute;
+  bottom: 100px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: white;
+  z-index: 10;
+  font-size: 0.9rem;
+  opacity: 0.9;
+  text-shadow: 0 1px 2px black;
+  pointer-events: none;
+}
+
+@keyframes scanMove {
+  0% { top: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
