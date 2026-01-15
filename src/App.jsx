@@ -22,7 +22,7 @@ function App() {
 
   return (
     <div className={styles.formContainer}>
-      <h1>Prueba Scanner Cédula</h1>
+      <h1>Prueba Scanner Cédula 1</h1>
       
       <button 
         className={styles.scanBtn}
