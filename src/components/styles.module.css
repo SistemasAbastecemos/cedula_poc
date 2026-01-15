@@ -227,3 +227,133 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+/* --- VARIABLES & RESET --- */
+/* (Mantén las variables anteriores igual) */
+
+/* ... (El resto del CSS de formContainer, scanBtn, inputs, modalOverlay, etc. se mantiene igual) ... */
+
+/* --- CAMBIOS IMPORTANTES AQUÍ ABAJO --- */
+
+/* Contenedor del video: Asegurar que ocupe todo */
+.qrReader {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.qrReader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* --- NUEVO OVERLAY: RECTÁNGULO PDF417 --- */
+.scanOverlay {
+  position: absolute;
+  top: 45%; /* Un poco más arriba del centro */
+  left: 50%;
+  transform: translate(-50%, -50%);
+  
+  /* DIMENSIONES PARA CÉDULA (4:1 aprox) */
+  width: 85%;
+  max-width: 400px;
+  height: 100px; 
+  
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 8px; /* Bordes menos redondos para simular código de barras */
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); /* Oscurece el fondo */
+  z-index: 5;
+  overflow: hidden;
+}
+
+/* Línea láser vertical (mejor para PDF417 que se lee horizontalmente) */
+.scanLine {
+  width: 2px;
+  height: 100%;
+  background: #ef4444;
+  position: absolute;
+  left: 0;
+  box-shadow: 0 0 4px #ef4444;
+  animation: scanMoveHorizontal 2s infinite linear;
+}
+
+@keyframes scanMoveHorizontal {
+  0% { left: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+
+.scanInstruction {
+  position: absolute;
+  top: 60%; /* Debajo del recuadro */
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: white;
+  z-index: 10;
+  font-size: 0.95rem;
+  padding: 0 20px;
+  text-shadow: 0 1px 3px black;
+  pointer-events: none;
+}
+
+/* --- BOTÓN DE LINTERNA --- */
+.torchButton {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255,255,255,0.4);
+  color: white;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 20;
+  backdrop-filter: blur(4px);
+  font-size: 1.2rem;
+  transition: all 0.2s;
+}
+
+.torchButtonActive {
+  background: rgba(255, 255, 0, 0.3);
+  border-color: rgba(255, 255, 0, 0.8);
+  color: #ffff00;
+  box-shadow: 0 0 15px rgba(255, 255, 0, 0.3);
+}
+
+.modalHeader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 15px;
+    display: flex;
+    justify_content: space-between;
+    align-items: center;
+    z-index: 20;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+}
+
+.modalHeader h3 {
+    color: white;
+    margin: 0;
+    font-size: 1rem;
+}
+.closeButton {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+}

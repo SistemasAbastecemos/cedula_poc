@@ -1,18 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faTimes, faBolt } from "@fortawesome/free-solid-svg-icons"; // Importamos rayo para flash
 import styles from "./styles.module.css";
 import { APELLIDOS_COLOMBIANOS } from "../utils/apellidos_colombianos";
 
-// ============================================================================
-// LÓGICA DE PARSEO (CÉDULAS COLOMBIANAS)
-// ============================================================================
+// (LA LÓGICA DE PARSEAR SE MANTIENE IGUAL, LA OMITO PARA AHORRAR ESPACIO PERO DEBES DEJARLA)
+// ... PEGA AQUÍ LA FUNCIÓN parsearDatosEscaneados DEL MENSAJE ANTERIOR ...
 const parsearDatosEscaneados = (rawData) => {
   if (!rawData || rawData.length < 5) return null;
 
-  console.log("=== INICIANDO PARSEO ===");
-  
   // 1. LIMPIEZA INICIAL
   let cleanData = "";
   for (let i = 0; i < rawData.length; i++) {
@@ -29,9 +26,8 @@ const parsearDatosEscaneados = (rawData) => {
     }
   }
   const dataNormalizada = cleanData.replace(/\s+/g, " ").trim();
-  console.log("Data Normalizada:", dataNormalizada);
   
-  // CASO 1: CÉDULA DIGITAL (PubDSK)
+  // CASO 1: CÉDULA DIGITAL
   if (dataNormalizada.includes("PubDSK") || rawData.includes("PubDSK")) {
      try {
         const indexAnchor = cleanData.indexOf("PubDSK");
@@ -44,9 +40,6 @@ const parsearDatosEscaneados = (rawData) => {
             if (match) {
                 const cedula = parseInt(match[1].slice(-10), 10).toString();
                 const nombresPegados = match[2];
-                // const genero = match[3];
-                // const f = match[4];
-                
                 let apellidos = "";
                 let nombres = "";
                 let resto = nombresPegados;
@@ -61,14 +54,13 @@ const parsearDatosEscaneados = (rawData) => {
                     }
                     nombres = resto;
                 } else { apellidos = nombresPegados; nombres = ""; }
-
                 return { tipo: "CEDULA_DIGITAL", cedula, apellidos: apellidos.trim(), nombres: nombres.trim() };
             }
         }
-     } catch (e) { console.error("Error Digital:", e); }
+     } catch (e) {}
   }
 
-  // CASO 2: CÉDULA ANTIGUA (Estrategia Sándwich)
+  // CASO 2: CÉDULA ANTIGUA
   const regexSandwich = /(\d{7,15})\s*([A-ZÑ\s]+?)\s*0([MF])(\d{8})/;
   const match = dataNormalizada.match(regexSandwich);
 
@@ -79,10 +71,8 @@ const parsearDatosEscaneados = (rawData) => {
       const cedula = parseInt(cedulaRaw, 10).toString();
       const textoNombres = match[2].trim(); 
       const partesNombre = textoNombres.split(" ").filter(Boolean);
-      
       let apellidos = "";
       let nombres = "";
-
       if (partesNombre.length >= 3) {
         apellidos = `${partesNombre[0]} ${partesNombre[1]}`;
         nombres = partesNombre.slice(2).join(" ");
@@ -92,105 +82,135 @@ const parsearDatosEscaneados = (rawData) => {
       } else {
         apellidos = textoNombres;
       }
-
       return { tipo: "CEDULA_ANTIGUA", cedula, apellidos: apellidos.trim(), nombres: nombres.trim() };
-    } catch (e) { console.error("Error procesando antigua:", e); }
+    } catch (e) {}
   }
   return null;
 };
 
+
 // ============================================================================
-// COMPONENTE VISUAL
+// COMPONENTE MEJORADO
 // ============================================================================
 const ScannerModal = ({ isOpen, onClose, onScan }) => {
   const scannerRef = useRef(null);
-  const [scanner, setScanner] = useState(null);
   const [error, setError] = useState("");
+  
+  // Estado para controlar la linterna
+  const [track, setTrack] = useState(null);
+  const [torchOn, setTorchOn] = useState(false);
+  const [hasTorch, setHasTorch] = useState(false);
+  
+  // Referencia al lector para poder limpiarlo
+  const codeReaderRef = useRef(null);
 
-  // Handler cuando la cámara detecta algo
   const handleCameraScan = useCallback((text) => {
-      // Limpieza básica de caracteres de control antes de enviar al parser
-      const cleanText = text.replace(/<F\d+>/gi, "").replace(/<CR>|<LF>|<GS>|<RS>|<US>/gi, "");
-      const resultado = parsearDatosEscaneados(cleanText);
-      
-      if (resultado) {
-        onScan(resultado);
-        onClose(); // Cerrar modal al tener éxito
-      } else {
-        console.log("Lectura detectada pero falló el parseo:", cleanText);
-      }
-    }, [onScan, onClose]);
+    // Si lee algo muy corto, lo ignoramos para no procesar basura
+    if (text.length < 10) return;
 
-  // Inicializador de la cámara
-  const initScanner = useCallback(() => {
+    const cleanText = text.replace(/<F\d+>/gi, "").replace(/<CR>|<LF>|<GS>|<RS>|<US>/gi, "");
+    const resultado = parsearDatosEscaneados(cleanText);
+    
+    if (resultado) {
+      onScan(resultado);
+      onClose();
+    }
+  }, [onScan, onClose]);
+
+  // Función para activar/desactivar linterna
+  const toggleTorch = async () => {
+    if (track && hasTorch) {
+      try {
+        await track.applyConstraints({
+          advanced: [{ torch: !torchOn }]
+        });
+        setTorchOn(!torchOn);
+      } catch (err) {
+        console.error("Error cambiando flash:", err);
+      }
+    }
+  };
+
+  const initScanner = useCallback(async () => {
     if (!scannerRef.current) return;
+    
     try {
+      // 1. CONFIGURACIÓN "TRY HARDER" PARA PDF417
       const hints = new Map();
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-        BarcodeFormat.PDF_417, // CRÍTICO: Formato de cédula colombiana
-        BarcodeFormat.CODE_128,
-        BarcodeFormat.QR_CODE,
+        BarcodeFormat.PDF_417, // Prioridad absoluta
+        BarcodeFormat.QR_CODE
       ]);
+      // Esto hace que el procesador sea más lento pero mucho más preciso
+      hints.set(DecodeHintType.TRY_HARDER, true); 
 
       const codeReader = new BrowserMultiFormatReader(hints);
+      codeReaderRef.current = codeReader;
+
       const videoElement = document.createElement("video");
-      
-      // Estilos forzados para asegurar que el video llene el contenedor
       videoElement.style.width = "100%";
       videoElement.style.height = "100%";
       videoElement.style.objectFit = "cover";
-
+      
       scannerRef.current.innerHTML = "";
       scannerRef.current.appendChild(videoElement);
 
-      navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" }, // Intenta usar cámara trasera
-        })
-        .then((stream) => {
-          videoElement.srcObject = stream;
-          // Importante para iOS: playsInline evita que se vaya a pantalla completa nativa
-          videoElement.setAttribute("playsinline", "true"); 
-          videoElement.play();
-          
-          codeReader.decodeFromStream(stream, videoElement, (result) => {
-            if (result) handleCameraScan(result.getText());
-          });
+      // 2. PEDIR CÁMARA CON ALTA RESOLUCIÓN (CRÍTICO PARA PDF417)
+      const constraints = {
+        video: { 
+          facingMode: "environment",
+          width: { ideal: 1920 }, // Full HD idealmente
+          height: { ideal: 1080 },
+          focusMode: "continuous" // Intentar forzar autoenfoque
+        }
+      };
 
-          // Guardamos la referencia para poder limpiar después
-          setScanner({
-            clear: () => {
-              stream.getTracks().forEach((t) => t.stop());
-              codeReader.reset();
-            },
-          });
-        })
-        .catch((err) => {
-          setError("No se pudo acceder a la cámara. Verifique permisos HTTPS.");
-          console.error(err);
-        });
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      // 3. DETECTAR SI TIENE LINTERNA
+      const videoTrack = stream.getVideoTracks()[0];
+      setTrack(videoTrack);
+      
+      // Chequear capacidades
+      const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+      if (capabilities.torch) {
+        setHasTorch(true);
+      }
+
+      videoElement.srcObject = stream;
+      videoElement.setAttribute("playsinline", "true");
+      await videoElement.play();
+
+      // Iniciar decodificación
+      codeReader.decodeFromStream(stream, videoElement, (result, err) => {
+        if (result) {
+          handleCameraScan(result.getText());
+        }
+      });
+
     } catch (err) {
-      setError("Error inicializando el lector.");
+      console.error("Error cámara:", err);
+      setError("No se pudo iniciar la cámara de alta resolución.");
     }
   }, [handleCameraScan]);
 
-  // Efecto para iniciar/detener
+  // Limpieza al cerrar
   useEffect(() => {
     if (isOpen) {
-      setError(""); // Resetear errores al abrir
-      const timer = setTimeout(initScanner, 300); // Pequeño delay para asegurar que el DOM renderizó
-      return () => {
-        clearTimeout(timer);
-        if (scanner) scanner.clear();
-      };
+      setError("");
+      setTorchOn(false);
+      // Pequeño delay para asegurar DOM
+      const t = setTimeout(initScanner, 300);
+      return () => clearTimeout(t);
     } else {
-        // Si se cierra el modal, asegurarnos de apagar la cámara
-        if (scanner) {
-            scanner.clear();
-            setScanner(null);
-        }
+      if (codeReaderRef.current) {
+        codeReaderRef.current.reset();
+      }
+      if (track) {
+        track.stop(); // Detener el track de video físicamente
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]); 
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -198,57 +218,41 @@ const ScannerModal = ({ isOpen, onClose, onScan }) => {
     <div className={styles.modalOverlay}>
       <div className={styles.modalContent}>
         
-        {/* Header Flotante */}
         <div className={styles.modalHeader}>
-          <h3>Escanear Cédula</h3>
+          <h3>Escanear Cédula (PDF417)</h3>
           <button onClick={onClose} className={styles.closeButton}>
             <FontAwesomeIcon icon={faTimes} />
           </button>
         </div>
 
-        {/* Área de la cámara (Video) */}
-        <div ref={scannerRef} className={styles.qrReader}>
-            {/* El video se inyecta aquí */}
-        </div>
+        <div ref={scannerRef} className={styles.qrReader} />
 
-        {/* ELEMENTOS VISUALES (SOLO DECORACIÓN) */}
+        {/* OVERLAY RECTANGULAR PARA CÉDULA */}
         {!error && (
           <>
             <div className={styles.scanOverlay}>
               <div className={styles.scanLine}></div>
             </div>
             <p className={styles.scanInstruction}>
-              Ubica el código de barras aquí
+              Ubica el código de barras dentro del rectángulo.<br/>
+              Asegura buena iluminación.
             </p>
+
+            {/* BOTÓN DE LINTERNA (Solo si el dispositivo lo soporta) */}
+            {hasTorch && (
+              <button 
+                className={`${styles.torchButton} ${torchOn ? styles.torchButtonActive : ''}`}
+                onClick={toggleTorch}
+              >
+                <FontAwesomeIcon icon={faBolt} />
+              </button>
+            )}
           </>
         )}
 
-        {/* Mensaje de Error si falla la cámara */}
         {error && (
-          <div style={{
-            position: 'absolute', 
-            top: '50%', 
-            left: 0,
-            right: 0,
-            transform: 'translateY(-50%)',
-            textAlign: 'center', 
-            color: 'white',
-            padding: '20px',
-            background: 'rgba(0,0,0,0.7)'
-          }}>
+          <div style={{position: 'absolute', top: '50%', textAlign: 'center', width: '100%', color: 'white'}}>
             <p>{error}</p>
-            <button 
-                onClick={onClose}
-                style={{
-                    marginTop: '10px',
-                    padding: '8px 16px',
-                    background: 'white',
-                    border: 'none',
-                    borderRadius: '4px'
-                }}
-            >
-                Cerrar
-            </button>
           </div>
         )}
       </div>
