@@ -365,5 +365,5 @@ const ScannerModal = ({ isOpen, onClose, onScan }) => {
     </div>
   );
 };
-
+///e
 export default ScannerModal;
